@@ -1,0 +1,25 @@
+{
+  "name": "ecfile",
+  "version": "0.0.2",
+  "description": "Make file operation Easy",
+  "main": "index.js",
+  "scripts": {
+    "test": "./bin/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luphia/ecFile.git"
+  },
+  "keywords": [
+    "file"
+  ],
+  "author": "Luphia Chang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Luphia/ecFile/issues"
+  },
+  "homepage": "https://github.com/Luphia/ecFile",
+  "dependencies": {
+
+  }
+}
