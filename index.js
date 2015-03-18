@@ -230,4 +230,4 @@ ecFile.prototype.toBlob = function () {
 	return this.toArrayBuffer(this.data.blob);
 };
 
-module.exports = EasyFile;
+module.exports = ecFile;
