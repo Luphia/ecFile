@@ -8,7 +8,7 @@ ecfile.loadFile(file)
 
 var json = ecfile.toJSON();
 var ecfile2 = new ecFile();
-var ecfile3 = new ecFile();
+var ecfile3 = new ecFile(json);
 
 ecfile.split(1024);
 ecfile.typeof(ecfile.getSlice(1)) == 'ecSlice';
@@ -18,8 +18,16 @@ var slice = ecfile.getSlice(i);
 ecfile2.loadSlice(slice);
 }
 
+console.log('=== check data type ===');
+ecfile.typeof(ecfile.getSlice(1)) == 'ecSlice';
+
+console.log('=== check slice combined ===');
 console.log(ecfile.toBase64() == ecfile2.toBase64());
 console.log(JSON.stringify(ecfile.toJSON()) == JSON.stringify(ecfile2.toJSON()));
+
+console.log('=== check json recovery ===');
+console.log(ecfile.toBase64() == ecfile3.toBase64());
+console.log(JSON.stringify(ecfile.toJSON()) == JSON.stringify(ecfile3.toJSON()));
 
 */
 
@@ -53,7 +61,7 @@ ecFile.prototype.typeof = function(data) {
 	var f = data || {};
 	var type = typeof(data);
 	if(type == 'object') {
-		if(typeof(f.id) == 'string' && f.id.split("_").length == 4 && this.crc32(f.id.substr(0,47)) == f.id.substr(47)) {
+		if(typeof(f.id) == 'string' && f.id.split("_").length == 4 && this.crc32(f.id.substr(0, f.id.lastIndexOf("_") + 1)) == f.id.substr(f.id.lastIndexOf("_") + 1)) {
 			type = "ecSlice";
 		}
 		else if(f.blob) {
@@ -189,18 +197,18 @@ ecFile.prototype.loadSlice = function(data) {
 		this.progress = new Array(tid);
 	};
 
-	this.data.id = id;
-	this.data.name = data.name;
-	this.data.type = data.type;
-	this.data.size = data.size;
-	this.data.sha1 = id;
 	this.progress[sid] = true;
 	this.Slice[sid] = new Buffer(data.blob, 'base64');
 
 	var final = this.getProgress();
 
 	if (final == 1) {
-		this.data.blob = Buffer.concat(this.Slice);
+		var opt = {
+			"id": id,
+			"name": data.name
+		}
+		var blob = Buffer.concat(this.Slice);
+		this.loadFile(blob, opt);
 	};
 };
 
