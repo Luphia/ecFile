@@ -103,7 +103,7 @@ ecFile.prototype.toArrayBuffer = function(blob) {
 	for (var i = 0; i < a; ++i) {
 		view[i] = blob[i];
 	};
-	return b;
+	return view;
 };
 
 ecFile.prototype.toBuffer = function(ab) {
@@ -293,7 +293,7 @@ ecFile.prototype.toBase64 = function () {
 	return bufferBase64;
 };
 ecFile.prototype.toBlob = function () {
-	return this.toArrayBuffer(this.data.blob);
+	return this.data.blob;
 };
 
 module.exports = ecFile;
