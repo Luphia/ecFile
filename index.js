@@ -1,11 +1,67 @@
 ﻿'use strict';
+/*
+var ecFile = require("./index.js")
+var fs = require("fs")
+var ecfile = new ecFile()
+var file = fs.readFileSync("xls1.xlsx")
+ecfile.loadFile(file)
+
+var json = ecfile.toJSON();
+var ecfile2 = new ecFile();
+var ecfile3 = new ecFile();
+
+ecfile.split(1024);
+ecfile.typeof(ecfile.getSlice(1)) == 'ecSlice';
+
+for(i=1; i<= ecfile.countSlice(); i++) {
+var slice = ecfile.getSlice(i);
+ecfile2.loadSlice(slice);
+}
+
+console.log(ecfile.toBase64() == ecfile2.toBase64());
+console.log(JSON.stringify(ecfile.toJSON()) == JSON.stringify(ecfile2.toJSON()));
+
+*/
 
 var crypto = require('crypto');
 var ecFile = function(data) { this.init(data); };
 
 ecFile.prototype.init = function (data) {
 	this.data = {};
+	this.callback = function() {};
+
+	var type = this.typeof(data);
+	if(Buffer.isBuffer(data)) {
+		this.loadFile(data);
+	}
+	else if(type == 'string') {
+		var buffer = new Buffer(data, 'base64');
+		this.loadFile(buffer);
+	}
+	else if(type == 'ecFile') {
+		var buffer = new Buffer(data.blob, 'base64');
+		this.loadFile(buffer, data);
+	}
+	else if(type == 'ecSlice') {
+		this.loadSlice(data);
+	}
+
 	return this;
+};
+
+ecFile.prototype.typeof = function(data) {
+	var f = data || {};
+	var type = typeof(data);
+	if(type == 'object') {
+		if(typeof(f.id) == 'string' && f.id.split("_").length == 4 && this.crc32(f.id.substr(0,47)) == f.id.substr(47)) {
+			type = "ecSlice";
+		}
+		else if(f.blob) {
+			type = "ecFile";
+		}
+	}
+
+	return type;
 };
 
 ecFile.prototype.makeCRCTable = function() {
@@ -32,12 +88,12 @@ ecFile.prototype.crc32 = function(str) {
 	return (crc ^ (-1)) >>> 0;
 };
 
-ecFile.prototype.toArrayBuffer = function(buffer) {
-	var a = buffer.length;
+ecFile.prototype.toArrayBuffer = function(blob) {
+	var a = blob.length;
 	var b = new ArrayBuffer(a);
 	var view = new Uint8Array(b);
 	for (var i = 0; i < a; ++i) {
-		view[i] = buffer[i];
+		view[i] = blob[i];
 	};
 	return b;
 };
@@ -55,9 +111,12 @@ ecFile.prototype.toBuffer = function(ab) {
 
 ecFile.prototype.loadFile = function(blob, opt) {
 	this.data.blob = blob;
-	this.data.name = opt.name || 'default';
-	this.data.type = opt.type || '';
+	if(!opt) { opt = {}; }
+
 	this.data.id = this.setID();
+	this.data.name = opt.name || this.data.id || 'default';
+	this.data.type = opt.type || '';
+	
 	this.data.sha1 = crypto.createHash('sha1').update(blob).digest('hex');
 	this.data.size = blob.length;
 };
@@ -119,7 +178,7 @@ ecFile.prototype.setCallback = function(callback) {
 	this.callback = callback;
 };
 
-ecFile.prototype.addSlice = function(data) {
+ecFile.prototype.loadSlice = function(data) {
 
 	var id = data.id.split('_')[0];
 	var sid = parseInt(data.id.split('_')[1], 10) - 1;
@@ -136,12 +195,12 @@ ecFile.prototype.addSlice = function(data) {
 	this.data.size = data.size;
 	this.data.sha1 = id;
 	this.progress[sid] = true;
-	this.Slice[sid] = data.blob;
+	this.Slice[sid] = new Buffer(data.blob, 'base64');
 
 	var final = this.getProgress();
 
 	if (final == 1) {
-		this.data.blob = this.Slice.join('');
+		this.data.blob = Buffer.concat(this.Slice);
 	};
 };
 
@@ -150,18 +209,18 @@ ecFile.prototype.split = function (Byte) {
 	this.reset();
 };
 
-ecFile.prototype.getSliceID = function (num) {
-	if (num <= 0) {
-		this.callback('your getSliceID is error');
-		return;
-	};
+ecFile.prototype.getSliceID = function(num) {
+	if (!num || num <= 0) { return false; }
+
 	var countSlice = this.countSlice();
 	var str = this.getID() + '_' + num + '_' + countSlice + '_';
-	var strcrc32 = crc32(str);
+	var strcrc32 = this.crc32(str);
 	return str + strcrc32;
 };
 
-ecFile.prototype.getSlice = function (num) {
+ecFile.prototype.getSlice = function(num) {
+	if(!num || num <= 0) { return false; }
+
 	var blob = this.data.blob;
 	var splitByte = this.splitByte;
 	var countSlice = this.countSlice();
@@ -173,9 +232,9 @@ ecFile.prototype.getSlice = function (num) {
 		var slblob = blob.slice(0, this.data.size, type);
 		var data = {
 			id: id,
-			type: 'EasyFile',
+			name: this.data.name,
 			sha1: crypto.createHash('sha1').update(slblob).digest('hex'),
-			blob: slblob
+			blob: new Buffer(slblob, 'binary').toString('base64')
 		};
 		return data;
 	} else if (countSlice >= num && this.data.size > splitByte) {
@@ -185,18 +244,17 @@ ecFile.prototype.getSlice = function (num) {
 		var slblob = blob.slice(start, end, type);
 		var data = {
 			id: id,
-			type: 'EasyFile',
+			name: this.data.name,
 			sha1: crypto.createHash('sha1').update(slblob).digest('hex'),
-			blob: slblob
+			blob: new Buffer(slblob, 'binary').toString('base64')
 		};
 		return data;
 	} else {
-		this.callback('your getSlice is error');
-		return;
+		return false;
 	};
 };
 
-ecFile.prototype.countSlice = function () {
+ecFile.prototype.countSlice = function() {
 	var blob = this.data.blob;
 	var splitByte = this.splitByte;
 	var a = this.data.size;
@@ -218,13 +276,13 @@ ecFile.prototype.toJSON = function () {
 		type: this.data.type,
 		size: this.data.size,
 		sha1: this.data.sha1,
-		blob: this.data.blob
+		blob: this.toBase64()
 	};
 	return data;
 };
-ecFile.prototype.toBase64 = function (blob, cb) {
-	var bufferBase64 = new Buffer(blob, 'binary').toString('base64');
-	cb(bufferBase64);
+ecFile.prototype.toBase64 = function () {
+	var bufferBase64 = new Buffer(this.data.blob, 'binary').toString('base64');
+	return bufferBase64;
 };
 ecFile.prototype.toBlob = function () {
 	return this.toArrayBuffer(this.data.blob);
